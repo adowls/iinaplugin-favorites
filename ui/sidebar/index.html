@@ -14,6 +14,15 @@
           <span>Favorites</span>
           <span class="count" id="count"></span>
         </div>
+        <div class="sort-container">
+          <select id="sortOrder" class="sort-select">
+            <option value="manual">Manual</option>
+            <option value="filename">Name</option>
+            <option value="date">Date</option>
+            <option value="path">Path</option>
+          </select>
+          <button id="sortDir" class="icon-btn sort-dir-btn" title="Toggle Direction">↑</button>
+        </div>
         <div class="actions">
           <button class="btn" id="refresh">Refresh</button>
           <button class="btn danger" id="deleteCurrent">Delete Current</button>

@@ -10,13 +10,15 @@
   "entry": "index.js",
   "permissions": [
     "show-osd",
-    "file-system"
+    "file-system",
+    "video-overlay"
   ],
   "sidebarTab": {
     "name": "Favorites"
   },
   "preferencesPage": "pref.html",
   "preferenceDefaults": {
-    "addFavoriteKeyBinding": "Meta+b"
+    "addFavoriteKeyBinding": "Meta+b",
+    "showFavoritesKeyBinding": "Meta+f"
   }
 }

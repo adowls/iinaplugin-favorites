@@ -116,8 +116,32 @@
         <input type="text" id="addFavoriteKeyBinding" data-pref-key="addFavoriteKeyBinding" value="Meta+b"
           placeholder="e.g. Meta+b" />
         <div class="hint">
-          Uses mpv key format. Examples: Meta+b, Meta+Shift+b, Ctrl+Alt+b. Changes take effect after reloading the
-          plugin or restarting IINA.
+          Uses mpv key format. Examples: Meta+b, Meta+Shift+b, Ctrl+Alt+b. Changes take effect after clicking
+          "Reload Hotkey" in the plugin menu.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="group" style="margin-top: 12px">
+    <div class="row">
+      <label for="showPreset">Show Favorites Shortcut</label>
+      <select id="showPreset">
+        <option value="Meta+f">Cmd+F (recommended)</option>
+        <option value="Meta+Shift+f">Cmd+Shift+F</option>
+        <option value="Meta+Alt+f">Cmd+Option+F</option>
+        <option value="Ctrl+Alt+f">Ctrl+Option+F</option>
+        <option value="custom">Custom…</option>
+      </select>
+    </div>
+
+    <div class="split">
+      <div class="row">
+        <label for="showFavoritesKeyBinding">Key Binding String</label>
+        <input type="text" id="showFavoritesKeyBinding" data-pref-key="showFavoritesKeyBinding" value="Meta+f"
+          placeholder="e.g. Meta+f" />
+        <div class="hint">
+          Uses mpv key format.
         </div>
       </div>
     </div>
@@ -127,6 +151,8 @@
     const prefs = iina.preferences;
     const preset = document.getElementById("preset");
     const input = document.getElementById("addFavoriteKeyBinding");
+    const showPreset = document.getElementById("showPreset");
+    const showInput = document.getElementById("showFavoritesKeyBinding");
 
     function setPresetValue(value) {
       if (value === "custom") return;
@@ -153,6 +179,33 @@
       prefs.sync();
       const presetValues = ["Meta+b", "Meta+Shift+b", "Meta+Alt+b", "Ctrl+Alt+b"];
       preset.value = presetValues.includes(value) ? value : "custom";
+    });
+
+    function setShowPresetValue(value) {
+      if (value === "custom") return;
+      showInput.value = value;
+      prefs.set("showFavoritesKeyBinding", value);
+      prefs.sync();
+    }
+
+    prefs.get("showFavoritesKeyBinding", (value) => {
+      if (typeof value === "string" && value) {
+        showInput.value = value;
+        const presetValues = ["Meta+f", "Meta+Shift+f", "Meta+Alt+f", "Ctrl+Alt+f"];
+        showPreset.value = presetValues.includes(value) ? value : "custom";
+      }
+    });
+
+    showPreset.addEventListener("change", (e) => {
+      setShowPresetValue(e.target.value);
+    });
+
+    showInput.addEventListener("change", (e) => {
+      const value = e.target.value.trim();
+      prefs.set("showFavoritesKeyBinding", value);
+      prefs.sync();
+      const presetValues = ["Meta+f", "Meta+Shift+f", "Meta+Alt+f", "Ctrl+Alt+f"];
+      showPreset.value = presetValues.includes(value) ? value : "custom";
     });
   </script>
 </body>

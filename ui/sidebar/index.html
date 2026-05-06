@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Favorites</title>
+    <link rel="stylesheet" href="sidebar.css" />
+    <script src="sidebar.js" defer></script>
+  </head>
+  <body>
+    <div class="app">
+      <div class="header">
+        <div class="title">
+          <span>Favorites</span>
+          <span class="count" id="count"></span>
+        </div>
+        <div class="actions">
+          <button class="btn" id="refresh">Refresh</button>
+          <button class="btn danger" id="deleteCurrent">Delete Current</button>
+        </div>
+      </div>
+      <div class="list" id="list"></div>
+      <div class="empty" id="empty">No favorites yet. Use the configured shortcut to add.</div>
+    </div>
+  </body>
+</html>

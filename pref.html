@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Favorites Settings</title>
+  <style>
+    :root {
+      --background-color: var(--system-background-color, #1e1e1e);
+      --secondary-background-color: var(--system-secondary-background-color, #262626);
+      --tertiary-background-color: var(--system-tertiary-background-color, #2d2d2d);
+      --text-color: var(--system-text-color, #ffffff);
+      --secondary-text-color: var(--system-secondary-text-color, #999999);
+      --accent-color: var(--system-accent-color, #007aff);
+      --separator-color: var(--system-separator-color, #404040);
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --background-color: #ffffff;
+        --secondary-background-color: #f5f5f5;
+        --tertiary-background-color: #e5e5e5;
+        --text-color: #000000;
+        --secondary-text-color: #666666;
+        --accent-color: #007aff;
+        --separator-color: #d1d1d1;
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 16px;
+      background-color: var(--background-color);
+      color: var(--text-color);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    h1 {
+      font-size: 16px;
+      font-weight: 600;
+      margin: 0 0 14px 0;
+    }
+
+    .group {
+      background-color: var(--secondary-background-color);
+      border-radius: 10px;
+      padding: 14px;
+      border: 1px solid var(--separator-color);
+    }
+
+    .row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    label {
+      font-weight: 600;
+    }
+
+    input[type="text"],
+    select {
+      border: 1px solid var(--separator-color);
+      background-color: var(--tertiary-background-color);
+      color: var(--text-color);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 13px;
+      outline: none;
+    }
+
+    input[type="text"]:focus,
+    select:focus {
+      border-color: var(--accent-color);
+      box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.2);
+    }
+
+    .hint {
+      font-size: 11px;
+      color: var(--secondary-text-color);
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Favorites Plugin Settings</h1>
+  <div class="group">
+    <div class="row">
+      <label for="preset">Add Favorite Shortcut</label>
+      <select id="preset">
+        <option value="Meta+b">Cmd+B (recommended)</option>
+        <option value="Meta+Shift+b">Cmd+Shift+B</option>
+        <option value="Meta+Alt+b">Cmd+Option+B</option>
+        <option value="Ctrl+Alt+b">Ctrl+Option+B</option>
+        <option value="custom">Custom…</option>
+      </select>
+    </div>
+
+    <div class="split">
+      <div class="row">
+        <label for="addFavoriteKeyBinding">Key Binding String</label>
+        <input type="text" id="addFavoriteKeyBinding" data-pref-key="addFavoriteKeyBinding" value="Meta+b"
+          placeholder="e.g. Meta+b" />
+        <div class="hint">
+          Uses mpv key format. Examples: Meta+b, Meta+Shift+b, Ctrl+Alt+b. Changes take effect after reloading the
+          plugin or restarting IINA.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const prefs = iina.preferences;
+    const preset = document.getElementById("preset");
+    const input = document.getElementById("addFavoriteKeyBinding");
+
+    function setPresetValue(value) {
+      if (value === "custom") return;
+      input.value = value;
+      prefs.set("addFavoriteKeyBinding", value);
+      prefs.sync();
+    }
+
+    prefs.get("addFavoriteKeyBinding", (value) => {
+      if (typeof value === "string" && value) {
+        input.value = value;
+        const presetValues = ["Meta+b", "Meta+Shift+b", "Meta+Alt+b", "Ctrl+Alt+b"];
+        preset.value = presetValues.includes(value) ? value : "custom";
+      }
+    });
+
+    preset.addEventListener("change", (e) => {
+      setPresetValue(e.target.value);
+    });
+
+    input.addEventListener("change", (e) => {
+      const value = e.target.value.trim();
+      prefs.set("addFavoriteKeyBinding", value);
+      prefs.sync();
+      const presetValues = ["Meta+b", "Meta+Shift+b", "Meta+Alt+b", "Ctrl+Alt+b"];
+      preset.value = presetValues.includes(value) ? value : "custom";
+    });
+  </script>
+</body>
+
+</html>

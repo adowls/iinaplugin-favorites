@@ -15,11 +15,82 @@ function formatDate(iso) {
   return d.toLocaleString();
 }
 
-let state = { favorites: [], currentUrl: null, sortOrder: "manual", sortAsc: true };
+let state = { favorites: [], currentUrl: null, sortOrder: "manual", sortAsc: true, missing: [] };
 
 function requestFavorites() {
   if (!window.iina) return;
   window.iina.postMessage("get-favorites");
+}
+
+function renderMissing() {
+  const section = document.getElementById("missingSection");
+  const missing = state.missing || [];
+  section.style.display = missing.length ? "block" : "none";
+  document.getElementById("missingCount").textContent = `(${missing.length})`;
+
+  const listEl = document.getElementById("missingList");
+  listEl.innerHTML = "";
+
+  for (const m of missing) {
+    const card = el("div", "missing-item");
+
+    const head = el("div", "missing-item-top");
+    const name = el("div", "missing-name");
+    name.textContent = m.filename || "Unknown";
+    const actions = el("div", "item-actions");
+
+    const findBtn = el("button", "btn");
+    findBtn.textContent = "Find file…";
+    findBtn.addEventListener("click", () => {
+      if (window.iina) window.iina.postMessage("choose-replacement", { id: m.id });
+    });
+
+    const delBtn = el("button", "btn danger");
+    delBtn.textContent = "Remove";
+    delBtn.addEventListener("click", () => {
+      if (window.iina) window.iina.postMessage("delete-favorite", { id: m.id });
+    });
+
+    actions.appendChild(findBtn);
+    actions.appendChild(delBtn);
+    head.appendChild(name);
+    head.appendChild(actions);
+
+    const origPath = el("div", "missing-path");
+    origPath.textContent = m.path || m.url || "";
+    origPath.title = "Original path not found";
+
+    card.appendChild(head);
+    card.appendChild(origPath);
+
+    if (m.candidates && m.candidates.length) {
+      const cands = el("div", "missing-candidates");
+      const candTitle = el("div", "missing-cand-title");
+      candTitle.textContent = "Similar files:";
+      cands.appendChild(candTitle);
+      for (const c of m.candidates) {
+        const row = el("div", "candidate-row");
+        const info = el("div", "candidate-info");
+        const cname = el("div", "candidate-name");
+        cname.textContent = c.filename;
+        const cpath = el("div", "candidate-path");
+        cpath.textContent = c.url || "";
+        info.appendChild(cname);
+        info.appendChild(cpath);
+        const useBtn = el("button", "btn");
+        useBtn.textContent = "Use";
+        useBtn.addEventListener("click", () => {
+          if (window.iina) window.iina.postMessage("set-favorite-path", { id: m.id, url: c.url, filename: c.filename });
+        });
+        row.appendChild(info);
+        row.appendChild(useBtn);
+        cands.appendChild(row);
+      }
+      card.appendChild(cands);
+    }
+
+    listEl.appendChild(card);
+  }
 }
 
 function el(tag, className) {
@@ -150,12 +221,17 @@ function render() {
 
     list.appendChild(item);
   }
+
+  renderMissing();
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("refresh").addEventListener("click", () => requestFavorites());
   document.getElementById("deleteCurrent").addEventListener("click", () => {
     if (window.iina) window.iina.postMessage("delete-current-favorite");
+  });
+  document.getElementById("rescanMissing").addEventListener("click", () => {
+    if (window.iina) window.iina.postMessage("rescan-missing");
   });
 
   const sortSelect = document.getElementById("sortOrder");
@@ -172,14 +248,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (window.iina) {
     window.iina.onMessage("favorites", (payload) => {
-      state = { favorites: payload.favorites || [], currentUrl: payload.currentUrl || null };
+      state.favorites = payload.favorites || [];
+      state.currentUrl = payload.currentUrl || null;
       render();
     });
     window.iina.onMessage("favorites-updated", (payload) => {
-      state = { favorites: payload.favorites || [], currentUrl: payload.currentUrl || null };
+      state.favorites = payload.favorites || [];
+      state.currentUrl = payload.currentUrl || null;
       render();
+    });
+    window.iina.onMessage("missing-favorites", (payload) => {
+      state.missing = payload.missing || [];
+      renderMissing();
     });
   }
 
   requestFavorites();
+  if (window.iina) window.iina.postMessage("rescan-missing");
 });

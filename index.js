@@ -3,6 +3,14 @@ const { core, event, sidebar, file, menu, console, input, preferences, utils, ov
 const FAVORITES_PATH = "@data/favorites.json";
 const PREF_ADD_FAVORITE_KEYBINDING = "addFavoriteKeyBinding";
 const PREF_SHOW_FAVORITES_KEYBINDING = "showFavoritesKeyBinding";
+const PREF_MISSING_SEARCH_ROOTS = "missingSearchRoots";
+
+const VIDEO_EXTENSIONS = [
+  "mp4", "mkv", "mov", "m4v", "webm", "flv", "wmv", "mpg",
+  "mpeg", "ts", "m2ts", "avi", "rmvb", "3gp",
+];
+
+let missingScanStarted = false;
 
 let favoritesCache = null;
 let pendingSeek = null;
@@ -73,6 +81,174 @@ function filenameFromUrl(url) {
   } catch {
     return last;
   }
+}
+
+function pathDirname(p) {
+  if (!p) return p;
+  const idx = p.lastIndexOf("/");
+  return idx <= 0 ? "/" : p.slice(0, idx);
+}
+
+function pathBasename(p) {
+  if (!p) return p;
+  const idx = p.lastIndexOf("/");
+  return idx < 0 ? p : p.slice(idx + 1);
+}
+
+function pathJoin(a, b) {
+  if (!a) return b;
+  if (!b) return a;
+  return a.replace(/\/+$/, "") + "/" + String(b).replace(/^\/+/, "");
+}
+
+function pathToFileUrl(p) {
+  return "file://" + encodeURIComponent(p).replace(/%2F/gi, "/");
+}
+
+function decodeFilePath(url) {
+  if (typeof url !== "string" || !url.startsWith("file://")) return null;
+  const raw = url.slice("file://".length);
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
+function hasVideoExtension(filename) {
+  const dot = (filename || "").lastIndexOf(".");
+  if (dot < 0) return false;
+  return VIDEO_EXTENSIONS.includes(filename.slice(dot + 1).toLowerCase());
+}
+
+function baseName(filename) {
+  const dot = (filename || "").lastIndexOf(".");
+  return dot > 0 ? filename.slice(0, dot) : filename;
+}
+
+function normalizeForMatch(s) {
+  return String(s || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\u4e00-\u9fff]+/g, " ")
+    .trim();
+}
+
+function similarityScore(originalBase, candidateBase) {
+  const a = normalizeForMatch(originalBase);
+  const b = normalizeForMatch(candidateBase);
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  if (a.includes(b) || b.includes(a)) {
+    return 0.8 + (Math.min(a.length, b.length) / Math.max(a.length, b.length)) * 0.15;
+  }
+  const tokensA = new Set(a.split(/\s+/));
+  const tokensB = new Set(b.split(/\s+/));
+  let inter = 0;
+  for (const t of tokensA) if (tokensB.has(t)) inter++;
+  const union = tokensA.size + tokensB.size - inter;
+  const jaccard = union ? inter / union : 0;
+  if (jaccard > 0) {
+    const lenRatio = Math.min(a.length, b.length) / Math.max(a.length, b.length);
+    return jaccard * 0.6 + lenRatio * 0.4;
+  }
+  return 0;
+}
+
+function getMissingSearchRoots() {
+  const value = preferences?.get(PREF_MISSING_SEARCH_ROOTS);
+  if (typeof value !== "string" || !value.trim()) return [];
+  return value
+    .split(/[\n,]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+async function findCandidates(originalPath, originalFilename) {
+  const candidates = [];
+  const seen = new Set();
+  const originalBase = baseName(originalFilename);
+
+  const add = (candidatePath, filename) => {
+    const url = pathToFileUrl(candidatePath);
+    if (seen.has(url)) return;
+    seen.add(url);
+    if (!hasVideoExtension(filename)) return;
+    const score = similarityScore(originalBase, baseName(filename));
+    if (score >= 0.35) candidates.push({ url, filename, score });
+  };
+
+  const dir = pathDirname(originalPath);
+  if (dir && file.exists(dir)) {
+    try {
+      for (const entry of file.list(dir)) {
+        if (!entry.isDir) add(pathJoin(dir, entry.path), entry.filename);
+      }
+    } catch { }
+  }
+
+  const nameQuery = `kMDItemFSName == "*${originalBase}*"c`;
+  const roots = getMissingSearchRoots();
+  try {
+    if (roots.length) {
+      for (const root of roots) {
+        if (!file.exists(root)) continue;
+        const output = await utils.exec("/usr/bin/mdfind", ["-onlyin", root, nameQuery]);
+        for (const line of (output || "").split("\n")) {
+          const trimmed = line.trim();
+          if (trimmed) add(trimmed, pathBasename(trimmed));
+        }
+      }
+    } else {
+      const output = await utils.exec("/usr/bin/mdfind", [nameQuery]);
+      for (const line of (output || "").split("\n")) {
+        const trimmed = line.trim();
+        if (trimmed) add(trimmed, pathBasename(trimmed));
+      }
+    }
+  } catch { }
+
+  candidates.sort((a, b) => b.score - a.score);
+  return candidates.slice(0, 6);
+}
+
+async function scanMissingFavorites() {
+  const favorites = loadFavorites();
+  const missing = [];
+  for (const fav of favorites) {
+    if (typeof fav.url !== "string" || !fav.url.startsWith("file://")) continue;
+    const path = decodeFilePath(fav.url);
+    if (!path || file.exists(path)) continue;
+    const filename = fav.filename || pathBasename(path);
+    missing.push({
+      id: fav.id,
+      url: fav.url,
+      filename,
+      path,
+      candidates: await findCandidates(path, filename),
+    });
+  }
+  return missing;
+}
+
+async function broadcastMissingFavorites() {
+  try {
+    const missing = await scanMissingFavorites();
+    sidebar.postMessage("missing-favorites", { missing });
+    if (missing.length) {
+      core.osd(`${missing.length} favorite${missing.length > 1 ? "s" : ""} missing`);
+    }
+  } catch { }
+}
+
+function updateFavoritePath(id, path, filename) {
+  const favorites = loadFavorites().slice();
+  const idx = favorites.findIndex((f) => f.id === id);
+  if (idx < 0) return;
+  favorites[idx].url = pathToFileUrl(path);
+  favorites[idx].filename = filename || favorites[idx].filename;
+  saveFavorites(favorites);
+  broadcastFavorites();
+  broadcastMissingFavorites();
 }
 
 function broadcastFavorites() {
@@ -187,6 +363,7 @@ function removeFavoriteById(id) {
   const favorites = loadFavorites().filter((f) => f.id !== id);
   saveFavorites(favorites);
   broadcastFavorites();
+  broadcastMissingFavorites();
 }
 
 function playFavorite(url, position) {
@@ -278,6 +455,32 @@ event.on("iina.window-loaded", () => {
   sidebar.onMessage("update-favorites", ({ favorites }) => {
     saveFavorites(favorites);
   });
+
+  sidebar.onMessage("rescan-missing", () => {
+    broadcastMissingFavorites();
+  });
+
+  sidebar.onMessage("choose-replacement", async ({ id }) => {
+    try {
+      const path = await utils.chooseFile("Select replacement file", {
+        chooseDir: false,
+        allowedFileTypes: VIDEO_EXTENSIONS.slice(),
+      });
+      if (!path) return;
+      updateFavoritePath(id, path, pathBasename(path));
+    } catch { }
+  });
+
+  sidebar.onMessage("set-favorite-path", ({ id, url, filename }) => {
+    const path = decodeFilePath(url);
+    if (!path) return;
+    updateFavoritePath(id, path, filename);
+  });
+
+  if (!missingScanStarted) {
+    missingScanStarted = true;
+    broadcastMissingFavorites();
+  }
 });
 
 event.on("iina.file-loaded", () => {

@@ -1,7 +1,7 @@
 {
   "name": "Favorites",
   "identifier": "com.adowls.iinaplugin.favorites",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Add current video to favorites with Cmd+B, and manage favorites in a sidebar panel.",
   "author": {
     "name": "adowls",
@@ -19,6 +19,7 @@
   "preferencesPage": "pref.html",
   "preferenceDefaults": {
     "addFavoriteKeyBinding": "Meta+b",
-    "showFavoritesKeyBinding": "Meta+f"
+    "showFavoritesKeyBinding": "Meta+f",
+    "missingSearchRoots": ""
   }
 }

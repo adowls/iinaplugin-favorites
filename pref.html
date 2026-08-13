@@ -147,12 +147,34 @@
     </div>
   </div>
 
+  <div class="group" style="margin-top: 12px">
+    <div class="row">
+      <label for="missingSearchRoots">Similar-file Search Roots</label>
+      <textarea id="missingSearchRoots" data-pref-key="missingSearchRoots" rows="3"
+        placeholder="One absolute folder path per line (e.g. /Users/name/Movies)"></textarea>
+      <div class="hint">
+        When a favorite's file is missing, the plugin searches these folders for a similar file by name.
+        Leave empty to search the whole disk via Spotlight. Separate multiple paths with a new line or comma.
+      </div>
+    </div>
+  </div>
+
   <script>
     const prefs = iina.preferences;
     const preset = document.getElementById("preset");
     const input = document.getElementById("addFavoriteKeyBinding");
     const showPreset = document.getElementById("showPreset");
     const showInput = document.getElementById("showFavoritesKeyBinding");
+    const missingRootsInput = document.getElementById("missingSearchRoots");
+
+    prefs.get("missingSearchRoots", (value) => {
+      missingRootsInput.value = typeof value === "string" ? value : "";
+    });
+
+    missingRootsInput.addEventListener("change", (e) => {
+      prefs.set("missingSearchRoots", e.target.value.trim());
+      prefs.sync();
+    });
 
     function setPresetValue(value) {
       if (value === "custom") return;
